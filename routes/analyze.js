@@ -1,0 +1,83 @@
+const { Router } = require("express");
+const { identifyFoods } = require("../services/visionApi");
+const { searchFoods, scaleMacros } = require("../services/usdaApi");
+
+const router = Router();
+
+const SUPPORTED_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+];
+
+// POST /api/analyze
+// Body: { image: "<base64>", mimeType?: "image/jpeg" }
+// Note: HEIC/HEIF is only supported when VISION_PROVIDER=gemini
+router.post("/", async (req, res) => {
+  const { image, mimeType = "image/jpeg" } = req.body;
+
+  if (!image) {
+    return res.status(400).json({ error: "image (base64) is required" });
+  }
+
+  if (!SUPPORTED_MIME_TYPES.includes(mimeType)) {
+    return res.status(400).json({
+      error: `Unsupported mimeType. Accepted: ${SUPPORTED_MIME_TYPES.join(", ")}`,
+    });
+  }
+
+  // Step 1: vision API — get food names + portion estimates
+  let identified;
+  try {
+    identified = await identifyFoods(image, mimeType);
+  } catch (err) {
+    return res.status(502).json({ error: "Vision API failed", detail: err.message });
+  }
+
+  // Step 2: USDA lookup for each identified food
+  const items = await Promise.all(
+    identified.map(async ({ name, portion_grams }) => {
+      try {
+        const results = await searchFoods(name, 1);
+        const food = results[0] ?? null;
+
+        if (!food) {
+          return { name, portion_grams, found: false, per100g: null, macros: null };
+        }
+
+        const macros = scaleMacros(food.per100g, portion_grams);
+        return {
+          name,
+          portion_grams,
+          found: true,
+          fdcId: food.fdcId,
+          usdaDescription: food.description,
+          per100g: food.per100g,
+          macros,
+        };
+      } catch {
+        return { name, portion_grams, found: false, per100g: null, macros: null };
+      }
+    })
+  );
+
+  // Step 3: sum totals across all found items
+  const totals = items
+    .filter((i) => i.macros)
+    .reduce(
+      (acc, i) => ({
+        calories: Math.round((acc.calories + i.macros.calories) * 10) / 10,
+        protein: Math.round((acc.protein + i.macros.protein) * 10) / 10,
+        carbs: Math.round((acc.carbs + i.macros.carbs) * 10) / 10,
+        fat: Math.round((acc.fat + i.macros.fat) * 10) / 10,
+      }),
+      { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    );
+
+  res.json({ items, totals });
+});
+
+module.exports = router;
