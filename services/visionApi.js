@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const PROMPT = `Analyze this food photo. List every distinct food item you can see.
 Return ONLY valid JSON — no markdown fences, no explanation:
 {"items":[{"name":"food name","portion_grams":100}]}

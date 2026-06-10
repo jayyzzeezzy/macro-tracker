@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const BASE = "https://api.nal.usda.gov/fdc/v1";
 
 // USDA nutrient IDs
