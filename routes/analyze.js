@@ -1,4 +1,5 @@
 const { Router } = require("express");
+const multer = require("multer");
 const { identifyFoods } = require("../services/visionApi");
 const { searchFoods, scaleMacros } = require("../services/usdaApi");
 
@@ -13,14 +14,43 @@ const SUPPORTED_MIME_TYPES = [
   "image/heif",
 ];
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (SUPPORTED_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Unsupported file type. Accepted: ${SUPPORTED_MIME_TYPES.join(", ")}`));
+    }
+  },
+});
+
 // POST /api/analyze
-// Body: { image: "<base64>", mimeType?: "image/jpeg" }
+// Accepts multipart/form-data with a "photo" file field, OR
+// JSON body { image: "<base64>", mimeType?: "image/jpeg" }
 // Note: HEIC/HEIF is only supported when VISION_PROVIDER=gemini
-router.post("/", async (req, res) => {
-  const { image, mimeType = "image/jpeg" } = req.body;
+router.post("/", upload.single("photo"), (req, res, next) => {
+  // multer file errors arrive here as err on next — surface them as 400
+  if (req.fileValidationError) {
+    return res.status(400).json({ error: req.fileValidationError });
+  }
+  next();
+}, async (req, res) => {
+  let image, mimeType;
+
+  if (req.file) {
+    // multipart/form-data upload
+    image = req.file.buffer.toString("base64");
+    mimeType = req.file.mimetype;
+  } else {
+    // JSON body fallback
+    image = req.body?.image;
+    mimeType = req.body?.mimeType ?? "image/jpeg";
+  }
 
   if (!image) {
-    return res.status(400).json({ error: "image (base64) is required" });
+    return res.status(400).json({ error: "Provide a photo file or a base64 image string" });
   }
 
   if (!SUPPORTED_MIME_TYPES.includes(mimeType)) {
