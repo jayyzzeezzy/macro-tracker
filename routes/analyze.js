@@ -75,7 +75,16 @@ router.post("/", upload.single("photo"), (req, res, next) => {
         const food = results[0] ?? null;
 
         if (!food) {
-          return { name, portion_grams, found: false, per100g: null, macros: null };
+          return {
+            name,
+            portion_grams,
+            found: false,
+            per100g: null,
+            calories: null,
+            protein: null,
+            carbs: null,
+            fat: null,
+          };
         }
 
         const macros = scaleMacros(food.per100g, portion_grams);
@@ -86,23 +95,35 @@ router.post("/", upload.single("photo"), (req, res, next) => {
           fdcId: food.fdcId,
           usdaDescription: food.description,
           per100g: food.per100g,
-          macros,
+          calories: macros.calories,
+          protein: macros.protein,
+          carbs: macros.carbs,
+          fat: macros.fat,
         };
       } catch {
-        return { name, portion_grams, found: false, per100g: null, macros: null };
+        return {
+          name,
+          portion_grams,
+          found: false,
+          per100g: null,
+          calories: null,
+          protein: null,
+          carbs: null,
+          fat: null,
+        };
       }
     })
   );
 
   // Step 3: sum totals across all found items
   const totals = items
-    .filter((i) => i.macros)
+    .filter((i) => i.found)
     .reduce(
       (acc, i) => ({
-        calories: Math.round((acc.calories + i.macros.calories) * 10) / 10,
-        protein: Math.round((acc.protein + i.macros.protein) * 10) / 10,
-        carbs: Math.round((acc.carbs + i.macros.carbs) * 10) / 10,
-        fat: Math.round((acc.fat + i.macros.fat) * 10) / 10,
+        calories: Math.round((acc.calories + i.calories) * 10) / 10,
+        protein: Math.round((acc.protein + i.protein) * 10) / 10,
+        carbs: Math.round((acc.carbs + i.carbs) * 10) / 10,
+        fat: Math.round((acc.fat + i.fat) * 10) / 10,
       }),
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
     );

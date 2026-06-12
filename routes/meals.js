@@ -10,7 +10,7 @@ async function getDemoUser() {
 }
 
 // POST /api/meals
-// Body: { items: [{ name, fdcId, portion_grams, macros }] }
+// Body: { items: [{ name, fdcId, portion_grams, calories, protein, carbs, fat }] }
 router.post("/", async (req, res) => {
   const { items } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
@@ -28,10 +28,10 @@ router.post("/", async (req, res) => {
             name: i.name,
             fdcId: i.fdcId ?? null,
             portionGrams: i.portion_grams,
-            calories: i.macros.calories,
-            protein: i.macros.protein,
-            carbs: i.macros.carbs,
-            fat: i.macros.fat,
+            calories: i.calories,
+            protein: i.protein,
+            carbs: i.carbs,
+            fat: i.fat,
           })),
         },
       },
