@@ -9,6 +9,17 @@ async function getDemoUser() {
   return user;
 }
 
+// Reshape a Prisma meal so item portionGrams (DB field) is output as portion_grams
+function serializeMeal(meal) {
+  return {
+    ...meal,
+    items: meal.items.map(({ portionGrams, ...rest }) => ({
+      ...rest,
+      portion_grams: portionGrams,
+    })),
+  };
+}
+
 // POST /api/meals
 // Body: { items: [{ name, fdcId, portion_grams, calories, protein, carbs, fat }] }
 router.post("/", async (req, res) => {
@@ -37,7 +48,7 @@ router.post("/", async (req, res) => {
       },
       include: { items: true },
     });
-    res.status(201).json(meal);
+    res.status(201).json(serializeMeal(meal));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -52,7 +63,7 @@ router.get("/", async (_req, res) => {
       include: { items: true },
       orderBy: { eatenAt: "desc" },
     });
-    res.json({ meals });
+    res.json({ meals: meals.map(serializeMeal) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -83,7 +94,7 @@ router.get("/daily", async (req, res) => {
         { calories: 0, protein: 0, carbs: 0, fat: 0 }
       );
 
-    res.json({ date: start, meals, totals });
+    res.json({ date: start, meals: meals.map(serializeMeal), totals });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
