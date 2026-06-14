@@ -50,7 +50,8 @@ router.post("/", async (req, res) => {
     });
     res.status(201).json(serializeMeal(meal));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("POST /api/meals failed:", err);
+    res.status(500).json({ error: "Something went wrong" });
   }
 });
 
@@ -65,7 +66,8 @@ router.get("/", async (_req, res) => {
     });
     res.json({ meals: meals.map(serializeMeal) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("GET /api/meals failed:", err);
+    res.status(500).json({ error: "Something went wrong" });
   }
 });
 
@@ -96,7 +98,8 @@ router.get("/daily", async (req, res) => {
 
     res.json({ date: start, meals: meals.map(serializeMeal), totals });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("GET /api/meals/daily failed:", err);
+    res.status(500).json({ error: "Something went wrong" });
   }
 });
 
