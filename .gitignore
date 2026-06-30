@@ -2,4 +2,7 @@ node_modules
 
 .env
 
+# private and public keys
+keys/
+
 /generated/prisma
