@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const passport = require("./lib/passport");
 
 const analyzeRouter = require("./routes/analyze");
 const usdaRouter = require("./routes/usda");
@@ -45,6 +46,10 @@ app.use(
 // express body-parser
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+// Initialize Passport. No passport.session() — we're stateless for now and
+// will add JWT later to persist logins.
+app.use(passport.initialize());
 
 // Throttle auth endpoints to slow brute-force / credential-stuffing attempts.
 const authLimiter = rateLimit({
