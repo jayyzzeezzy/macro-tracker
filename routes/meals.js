@@ -1,12 +1,27 @@
 const { Router } = require("express");
+const { randomUUID } = require("crypto");
 const { prisma } = require("../lib/prisma.js");
 
 const router = Router();
 
-async function getDemoUser() {
-  const user = await prisma.user.findFirst({ where: { isDemo: true } });
-  if (!user) throw new Error("Demo user not found — run npm run db:seed");
-  return user;
+// Build a meal-shaped object for demo users without touching the DB, so the
+// app behaves the same while nothing is persisted. Ids are generated on the fly.
+function buildDemoMeal(userId, items) {
+  return serializeMeal({
+    id: randomUUID(),
+    userId,
+    eatenAt: new Date(),
+    items: items.map((i) => ({
+      id: randomUUID(),
+      name: i.name,
+      fdcId: i.fdcId ?? null,
+      portionGrams: i.portion_grams,
+      calories: i.calories,
+      protein: i.protein,
+      carbs: i.carbs,
+      fat: i.fat,
+    })),
+  });
 }
 
 // Reshape a Prisma meal so item portionGrams (DB field) is output as portion_grams
@@ -28,11 +43,15 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "items array is required" });
   }
 
+  // Demo users can log meals to explore the app, but nothing is persisted.
+  if (req.user.isDemo) {
+    return res.status(201).json(buildDemoMeal(req.user.id, items));
+  }
+
   try {
-    const user = await getDemoUser();
     const meal = await prisma.meal.create({
       data: {
-        userId: user.id,
+        userId: req.user.id,
         eatenAt: new Date(),
         items: {
           create: items.map((i) => ({
@@ -56,11 +75,15 @@ router.post("/", async (req, res) => {
 });
 
 // GET /api/meals
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
+  // Demo meals aren't persisted, so there's nothing to list.
+  if (req.user.isDemo) {
+    return res.json({ meals: [] });
+  }
+
   try {
-    const user = await getDemoUser();
     const meals = await prisma.meal.findMany({
-      where: { userId: user.id },
+      where: { userId: req.user.id },
       include: { items: true },
       orderBy: { eatenAt: "desc" },
     });
@@ -77,10 +100,18 @@ router.get("/daily", async (req, res) => {
   const start = new Date(new Date(date).setHours(0, 0, 0, 0));
   const end = new Date(new Date(date).setHours(23, 59, 59, 999));
 
+  // Demo meals aren't persisted, so the daily log is always empty.
+  if (req.user.isDemo) {
+    return res.json({
+      date: start,
+      meals: [],
+      totals: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+    });
+  }
+
   try {
-    const user = await getDemoUser();
     const meals = await prisma.meal.findMany({
-      where: { userId: user.id, eatenAt: { gte: start, lte: end } },
+      where: { userId: req.user.id, eatenAt: { gte: start, lte: end } },
       include: { items: true },
     });
 

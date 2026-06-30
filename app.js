@@ -2,8 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
 const passport = require("./lib/passport");
+const requireAuth = require("./lib/requireAuth");
 
 const analyzeRouter = require("./routes/analyze");
 const usdaRouter = require("./routes/usda");
@@ -51,19 +51,14 @@ app.use(express.urlencoded({ extended: true }));
 // will add JWT later to persist logins.
 app.use(passport.initialize());
 
-// Throttle auth endpoints to slow brute-force / credential-stuffing attempts.
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // max requests per IP per window
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many attempts, please try again later" },
-});
+// Protected routes — require a valid JWT (Authorization: Bearer <token>).
+app.use("/api/analyze", requireAuth, analyzeRouter);
+app.use("/api/usda", requireAuth, usdaRouter);
+app.use("/api/meals", requireAuth, mealsRouter);
 
-app.use("/api/analyze", analyzeRouter);
-app.use("/api/usda", usdaRouter);
-app.use("/api/meals", mealsRouter);
-app.use("/api/auth", authLimiter, authRouter);
+// Public — signup/signin must be reachable without a token. The rate limiter
+// is applied per-route inside the router (so /me stays unlimited).
+app.use("/api/auth", authRouter);
 
 app.get("/", (req, res) => {
     res.json({ message: "Welcome to MacroSnap!" });
