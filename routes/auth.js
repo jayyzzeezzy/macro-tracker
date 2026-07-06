@@ -53,11 +53,12 @@ router.post("/signup", authLimiter, signupValidators, handleValidation, async (r
       data: { email, passwordHash },
     });
 
-    // Never return the password hash
+    // Auto-login: issue a token so the user is signed in immediately.
+    // Same response shape as /signin (never return the password hash).
+    const token = signToken(user);
     return res.status(201).json({
-      id: user.id,
-      email: user.email,
-      createdAt: user.createdAt,
+      token,
+      user: { id: user.id, email: user.email },
     });
   } catch (err) {
     console.error("POST /api/auth/signup failed:", err);
