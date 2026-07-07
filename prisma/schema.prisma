@@ -15,10 +15,16 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   email        String?  @unique
+  name         String?  // display name — how the user wants to be addressed
   passwordHash String?
   googleId     String?  @unique
   isDemo       Boolean  @default(false)
   createdAt    DateTime @default(now())
+  // Daily macro goals — defaults match the frontend's previous localStorage defaults.
+  caloriesGoal Float    @default(2000)
+  proteinGoal  Float    @default(150)
+  carbsGoal    Float    @default(200)
+  fatGoal      Float    @default(65)
   meals        Meal[]
 }
 

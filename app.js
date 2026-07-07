@@ -8,6 +8,7 @@ const requireAuth = require("./lib/requireAuth");
 const analyzeRouter = require("./routes/analyze");
 const usdaRouter = require("./routes/usda");
 const mealsRouter = require("./routes/meals");
+const goalsRouter = require("./routes/goals");
 const authRouter = require("./routes/auth");
 
 const app = express();
@@ -55,6 +56,7 @@ app.use(passport.initialize());
 app.use("/api/analyze", requireAuth, analyzeRouter);
 app.use("/api/usda", requireAuth, usdaRouter);
 app.use("/api/meals", requireAuth, mealsRouter);
+app.use("/api/goals", requireAuth, goalsRouter);
 
 // Public — signup/signin must be reachable without a token. The rate limiter
 // is applied per-route inside the router (so /me stays unlimited).

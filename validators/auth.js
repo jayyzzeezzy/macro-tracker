@@ -27,6 +27,17 @@ const email = body("email")
 
 const signupValidators = [
   email,
+  // Display name — how the user wants to be addressed. Names legitimately
+  // contain spaces, apostrophes, hyphens and accented letters, so we only
+  // check presence/length here. It IS rendered in the UI, so the frontend
+  // must output-encode it (defense against XSS is the caller's job).
+  body("name")
+    .trim()
+    .notEmpty()
+    .withMessage("Name is required")
+    .bail()
+    .isLength({ max: 50 })
+    .withMessage("Name must be 50 characters or fewer"),
   body("password")
     .exists({ values: "falsy" })
     .withMessage("Password is required")

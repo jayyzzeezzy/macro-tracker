@@ -36,9 +36,9 @@ function handleValidation(req, res, next) {
 }
 
 // POST /api/auth/signup
-// Body: { email, password }
+// Body: { email, name, password }
 router.post("/signup", authLimiter, signupValidators, handleValidation, async (req, res) => {
-  const { email, password } = req.body;
+  const { email, name, password } = req.body;
 
   try {
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -50,7 +50,7 @@ router.post("/signup", authLimiter, signupValidators, handleValidation, async (r
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const user = await prisma.user.create({
-      data: { email, passwordHash },
+      data: { email, name, passwordHash },
     });
 
     // Auto-login: issue a token so the user is signed in immediately.
@@ -58,7 +58,7 @@ router.post("/signup", authLimiter, signupValidators, handleValidation, async (r
     const token = signToken(user);
     return res.status(201).json({
       token,
-      user: { id: user.id, email: user.email },
+      user: { id: user.id, email: user.email, name: user.name },
     });
   } catch (err) {
     console.error("POST /api/auth/signup failed:", err);
@@ -84,7 +84,10 @@ router.post("/signin", authLimiter, signinValidators, handleValidation, (req, re
     // Issue a signed JWT so the client can authenticate subsequent requests
     // via the Authorization: Bearer <token> header.
     const token = signToken(user);
-    return res.json({ token, user: { id: user.id, email: user.email } });
+    return res.json({
+      token,
+      user: { id: user.id, email: user.email, name: user.name },
+    });
   })(req, res, next);
 });
 
@@ -95,6 +98,7 @@ router.get("/me", requireAuth, (req, res) => {
   res.json({
     id: req.user.id,
     email: req.user.email,
+    name: req.user.name,
     isDemo: req.user.isDemo,
   });
 });
@@ -113,7 +117,8 @@ router.post("/demo", authLimiter, async (req, res) => {
     const token = signToken(demo);
     return res.json({
       token,
-      user: { id: demo.id, email: demo.email, isDemo: true },
+      // Demo user has no stored name — show a friendly default.
+      user: { id: demo.id, email: demo.email, name: demo.name ?? "Guest", isDemo: true },
     });
   } catch (err) {
     console.error("POST /api/auth/demo failed:", err);
