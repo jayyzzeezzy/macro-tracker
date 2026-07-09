@@ -108,6 +108,9 @@ router.get("/me", requireAuth, (req, res) => {
     email: req.user.email,
     name: req.user.name,
     isDemo: req.user.isDemo,
+    // Whether the account has a password — lets the frontend show a
+    // "set password" option to Google/passwordless users. Never expose the hash.
+    hasPassword: Boolean(req.user.passwordHash),
   });
 });
 
