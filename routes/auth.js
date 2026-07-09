@@ -13,6 +13,10 @@ const router = Router();
 // bcrypt work factor — higher is slower/safer. 12 is a sensible default.
 const BCRYPT_ROUNDS = 12;
 
+// Where to send the browser after Google OAuth completes. The SPA reads the
+// token from the URL fragment (see /google/callback below).
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+
 // Throttle the sensitive auth actions (signup/signin/demo) to slow brute-force
 // and credential-stuffing. Applied per-route so read-only /me stays unlimited
 // (the frontend calls it on every page load to validate the stored token).
@@ -125,5 +129,30 @@ router.post("/demo", authLimiter, async (req, res) => {
     return res.status(500).json({ error: "Something went wrong" });
   }
 });
+
+// GET /api/auth/google
+// Kicks off "Continue with Google" — redirects the browser to Google's consent
+// screen. No token yet; this just starts the OAuth flow.
+router.get(
+  "/google",
+  passport.authenticate("google", { scope: ["profile", "email"], session: false })
+);
+
+// GET /api/auth/google/callback
+// Google redirects here after the user approves. Passport runs the Google
+// strategy (find/link/create the user), then we mint our own JWT and hand it
+// to the SPA via the URL fragment (#token=...), which keeps it out of server
+// logs and the Referer header. On failure, bounce back to the frontend login.
+router.get(
+  "/google/callback",
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: `${FRONTEND_URL}/login?error=google_auth_failed`,
+  }),
+  (req, res) => {
+    const token = signToken(req.user);
+    res.redirect(`${FRONTEND_URL}/auth/callback#token=${token}`);
+  }
+);
 
 module.exports = router;
