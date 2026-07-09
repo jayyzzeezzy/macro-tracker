@@ -4,6 +4,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const passport = require("./lib/passport");
 const requireAuth = require("./lib/requireAuth");
+const { analyzeLimiter, usdaLimiter, usdaGlobalLimiter } = require("./lib/rateLimiters");
 
 const analyzeRouter = require("./routes/analyze");
 const usdaRouter = require("./routes/usda");
@@ -53,8 +54,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
 
 // Protected routes — require a valid JWT (Authorization: Bearer <token>).
-app.use("/api/analyze", requireAuth, analyzeRouter);
-app.use("/api/usda", requireAuth, usdaRouter);
+app.use("/api/analyze", requireAuth, analyzeLimiter, analyzeRouter);
+app.use("/api/usda", requireAuth, usdaLimiter, usdaGlobalLimiter, usdaRouter);
 app.use("/api/meals", requireAuth, mealsRouter);
 app.use("/api/goals", requireAuth, goalsRouter);
 

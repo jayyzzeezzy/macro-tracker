@@ -1,9 +1,19 @@
 require("dotenv").config();
 
+const { TtlCache } = require("../lib/ttlCache.js");
+
 const BASE = "https://api.nal.usda.gov/fdc/v1";
 
 // USDA nutrient IDs
 const NUTRIENT = { calories: 1008, protein: 1003, carbs: 1005, fat: 1004 };
+
+// Cache USDA responses. Food data is effectively static, so a long TTL is
+// safe; caching cuts cost and protects the shared 1000 req/hour USDA quota
+// (repeat lookups of common foods never hit the network). Only successful
+// responses are cached — errors fall through and are retried.
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const searchCache = new TtlCache({ ttlMs: CACHE_TTL_MS, maxEntries: 1000 });
+const foodCache = new TtlCache({ ttlMs: CACHE_TTL_MS, maxEntries: 1000 });
 
 function getKey() {
   return process.env.USDA_API_KEY || "DEMO_KEY";
@@ -36,6 +46,11 @@ function scaleMacros(per100g, grams) {
 }
 
 async function searchFoods(query, pageSize = 5) {
+  // Key on the normalized query + pageSize (pageSize changes the result set).
+  const cacheKey = `${pageSize}:${query.trim().toLowerCase()}`;
+  const cached = searchCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   const params = new URLSearchParams({
     query,
     api_key: getKey(),
@@ -48,15 +63,22 @@ async function searchFoods(query, pageSize = 5) {
   if (!res.ok) throw new Error(`USDA search failed: ${res.status}`);
 
   const data = await res.json();
-  return (data.foods ?? []).map((f) => ({
+  const foods = (data.foods ?? []).map((f) => ({
     fdcId: f.fdcId,
     description: f.description,
     dataType: f.dataType,
     per100g: extractMacros(f.foodNutrients ?? []),
   }));
+
+  searchCache.set(cacheKey, foods);
+  return foods;
 }
 
 async function getFoodById(fdcId) {
+  const cacheKey = String(fdcId);
+  const cached = foodCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   const params = new URLSearchParams({
     api_key: getKey(),
     nutrients: Object.values(NUTRIENT).join(","),
@@ -66,12 +88,15 @@ async function getFoodById(fdcId) {
   if (!res.ok) throw new Error(`USDA food lookup failed: ${res.status}`);
 
   const f = await res.json();
-  return {
+  const food = {
     fdcId: f.fdcId,
     description: f.description,
     dataType: f.dataType,
     per100g: extractMacros(f.foodNutrients ?? []),
   };
+
+  foodCache.set(cacheKey, food);
+  return food;
 }
 
 module.exports = { searchFoods, getFoodById, scaleMacros };
