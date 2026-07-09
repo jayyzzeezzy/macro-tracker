@@ -25,6 +25,27 @@ const email = body("email")
   .withMessage("Email is too long")
   .customSanitizer((v) => v.toLowerCase());
 
+// Password strength rules — shared by signup and set-password.
+const password = body("password")
+  .exists({ values: "falsy" })
+  .withMessage("Password is required")
+  .bail()
+  .isString()
+  .withMessage("Password must be a string")
+  .bail()
+  .isLength({ min: 8, max: 50 })
+  .withMessage("Password must be 8–50 characters")
+  .matches(hasLower)
+  .withMessage("Password must include a lowercase letter")
+  .matches(hasUpper)
+  .withMessage("Password must include an uppercase letter")
+  .matches(hasDigit)
+  .withMessage("Password must include a number")
+  .matches(hasSpecial)
+  .withMessage("Password must include a special character")
+  .matches(allowedOnly)
+  .withMessage(`Password contains disallowed characters (not allowed: < > & " ' \` / \\)`);
+
 const signupValidators = [
   email,
   // Display name — how the user wants to be addressed. Names legitimately
@@ -38,25 +59,7 @@ const signupValidators = [
     .bail()
     .isLength({ max: 50 })
     .withMessage("Name must be 50 characters or fewer"),
-  body("password")
-    .exists({ values: "falsy" })
-    .withMessage("Password is required")
-    .bail()
-    .isString()
-    .withMessage("Password must be a string")
-    .bail()
-    .isLength({ min: 8, max: 50 })
-    .withMessage("Password must be 8–50 characters")
-    .matches(hasLower)
-    .withMessage("Password must include a lowercase letter")
-    .matches(hasUpper)
-    .withMessage("Password must include an uppercase letter")
-    .matches(hasDigit)
-    .withMessage("Password must include a number")
-    .matches(hasSpecial)
-    .withMessage("Password must include a special character")
-    .matches(allowedOnly)
-    .withMessage(`Password contains disallowed characters (not allowed: < > & " ' \` / \\)`),
+  password,
 ];
 
 const signinValidators = [
@@ -64,4 +67,8 @@ const signinValidators = [
   body("password").notEmpty().withMessage("Password is required"),
 ];
 
-module.exports = { signupValidators, signinValidators };
+// For an authenticated user setting a password on a passwordless account
+// (e.g. one created via Google). Same strength rules; no email/name needed.
+const setPasswordValidators = [password];
+
+module.exports = { signupValidators, signinValidators, setPasswordValidators };

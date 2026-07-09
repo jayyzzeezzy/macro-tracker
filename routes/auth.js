@@ -6,7 +6,11 @@ const { prisma } = require("../lib/prisma.js");
 const passport = require("../lib/passport.js");
 const requireAuth = require("../lib/requireAuth.js");
 const { signToken } = require("../lib/jwt.js");
-const { signupValidators, signinValidators } = require("../validators/auth.js");
+const {
+  signupValidators,
+  signinValidators,
+  setPasswordValidators,
+} = require("../validators/auth.js");
 
 const router = Router();
 
@@ -105,6 +109,37 @@ router.get("/me", requireAuth, (req, res) => {
     name: req.user.name,
     isDemo: req.user.isDemo,
   });
+});
+
+// POST /api/auth/set-password
+// Body: { password }
+// Lets an authenticated user set a password on a passwordless account (e.g. one
+// created via "Continue with Google"), so they can also log in with email +
+// password. The JWT proves identity, so no current password is required.
+// Deliberately refuses if a password already exists — changing an existing
+// password must go through a flow that verifies the current one.
+router.post("/set-password", authLimiter, requireAuth, setPasswordValidators, handleValidation, async (req, res) => {
+  // Demo account is shared — never let it gain a password.
+  if (req.user.isDemo) {
+    return res.status(403).json({ error: "Demo accounts can't set a password" });
+  }
+  if (req.user.passwordHash) {
+    return res
+      .status(409)
+      .json({ error: "A password is already set for this account" });
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(req.body.password, BCRYPT_ROUNDS);
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { passwordHash },
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("POST /api/auth/set-password failed:", err);
+    return res.status(500).json({ error: "Something went wrong" });
+  }
 });
 
 // POST /api/auth/demo
